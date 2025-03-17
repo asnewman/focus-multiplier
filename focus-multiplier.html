@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Example</title>
+    <script src="https://cdn.jsdelivr.net/gh/asnewman/ashjs@v0.0.13/index.js"></script>
+  </head>
+  <body class="">
+    <div id="ashjs"></div>
+    <script type="text/javascript">
+      const store = {
+        start: null,
+        interval: null,
+        showBreakdown: false,
+      }
+
+      function formatTimeDifference(start) {
+        const diff = new Date() - start; // Difference in milliseconds
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        let result = [];
+
+        if (hours > 0) result.push(`${hours}h`);
+        if (minutes > 0) result.push(`${minutes}m`);
+        result.push(`${seconds}s`);
+
+        return result.join(" ");
+      }
+
+      function calculateEarnings(start) {
+        const SECONDS_IN_MINUTE = 60;
+        const MINUTES_25 = 25 * SECONDS_IN_MINUTE;
+        const MINUTES_50 = 50 * SECONDS_IN_MINUTE;
+        const MINUTES_90 = 90 * SECONDS_IN_MINUTE;
+
+        const RATE_1 = 0.001; // 0.1 cent per second (0 - 25 min)
+        const RATE_2 = 0.002; // 0.2 cents per second (25 - 50 min)
+        const RATE_3 = 0.00225; // 0.225 cents per second (50 - 90 min)
+        const RATE_4 = 0.001; // 0.1 cent per second (90+ min)
+
+        const diffInSeconds = Math.floor((new Date() - start) / 1000);
+
+        let earnings = 0;
+        let breakdown = [];
+
+        function formatAmount(amount) {
+          return `$${amount.toFixed(2)}`;
+        }
+
+        if (diffInSeconds <= MINUTES_25) {
+          earnings = diffInSeconds * RATE_1;
+          breakdown.push({ seconds: diffInSeconds, rate: RATE_1, amount: formatAmount(earnings) });
+        } else if (diffInSeconds <= MINUTES_50) {
+          let tier1 = MINUTES_25 * RATE_1;
+          let tier2 = (diffInSeconds - MINUTES_25) * RATE_2;
+          earnings = tier1 + tier2;
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1) });
+          breakdown.push({ seconds: diffInSeconds - MINUTES_25, rate: RATE_2, amount: formatAmount(tier2) });
+        } else if (diffInSeconds <= MINUTES_90) {
+          let tier1 = MINUTES_25 * RATE_1;
+          let tier2 = MINUTES_25 * RATE_2;
+          let tier3 = (diffInSeconds - MINUTES_50) * RATE_3;
+          earnings = tier1 + tier2 + tier3;
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1) });
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_2, amount: formatAmount(tier2) });
+          breakdown.push({ seconds: diffInSeconds - MINUTES_50, rate: RATE_3, amount: formatAmount(tier3) });
+        } else {
+          let tier1 = MINUTES_25 * RATE_1;
+          let tier2 = MINUTES_25 * RATE_2;
+          let tier3 = 40 * SECONDS_IN_MINUTE * RATE_3;
+          let tier4 = (diffInSeconds - MINUTES_90) * RATE_4;
+          earnings = tier1 + tier2 + tier3 + tier4;
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1) });
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_2, amount: formatAmount(tier2) });
+          breakdown.push({ seconds: 40 * SECONDS_IN_MINUTE, rate: RATE_3, amount: formatAmount(tier3) });
+          breakdown.push({ seconds: diffInSeconds - MINUTES_90, rate: RATE_4, amount: formatAmount(tier4) });
+        }
+
+        return {
+          total: formatAmount(earnings),
+          breakdown
+        };
+      }
+
+      const routes = {
+        "/": () => {
+          const earnings = calculateEarnings(store.start)
+
+          return `
+            -div(id="container" style="position: absolute; right: 20px; bottom: 20px; background: #f8f9fa; padding: 12px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); font-family: Arial, sans-serif; font-size: 14px; color: #333; border: 1px solid #ddd;")
+            -{${
+                !store.start ? `
+                  -button(onclick="start" style="background: #019106; color: white; border: none; padding: 8px 12px; font-size: 14px; border-radius: 4px; cursor: pointer;")
+                  --"Start"
+                ` : ""
+              }}
+            -{${
+              store.start ? `
+                -button(onclick="stop" style="background: #dc3545; color: white; border: none; padding: 8px 12px; font-size: 14px; border-radius: 4px; cursor: pointer;")
+                --"Stop"
+                -div(style="margin-top: 8px; font-weight: bold;")
+                --"Duration: ${formatTimeDifference(store.start)}"
+                -div(onclick="toggleBreakdown" style="cursor: pointer; color: #007bff; text-decoration: underline; margin-top: 4px;")
+                --"Earnings: ${earnings.total}"
+              ` : ""
+            }}
+            -{${
+              store.showBreakdown ? `
+                ${earnings.breakdown.map((b, idx) => `-div(style="margin-top: 4px; color: #555; font-weight: bold;")--"Tier ${idx + 1}: ${b.amount} (${b.seconds} seconds @ ${b.rate})"`).join("")}
+              ` : ""
+            }}
+          `
+        }
+      }
+
+      const events = {
+        "start": (data, render) => {
+          if (store.start) return;
+
+          store.start = new Date();
+          render()
+          store.interval = setInterval(() => {
+            render()
+          }, 1000)
+        },
+        "stop": (data, render) => {
+          if (!store.start) return;
+
+          store.start = null
+          clearInterval(store.interval)
+          store.internval = null
+          store.showBreakdown = false
+          render()
+        },
+        "toggleBreakdown": (data, render) => {
+          store.showBreakdown = !store.showBreakdown
+          render()
+        }
+      }
+
+      new window.Ash(routes, events)
+    </script>
+  </body>
+</html>
