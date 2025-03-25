@@ -37,10 +37,11 @@
         const MINUTES_50 = 50 * SECONDS_IN_MINUTE;
         const MINUTES_90 = 90 * SECONDS_IN_MINUTE;
 
-        const RATE_1 = 0.001; // 0.1 cent per second (0 - 25 min)
+        const RATE_1 = 0.00085; // Updated to 0.085 cent per second (0 - 25 min)
         const RATE_2 = 0.002; // 0.2 cents per second (25 - 50 min)
         const RATE_3 = 0.00225; // 0.225 cents per second (50 - 90 min)
         const RATE_4 = 0.001; // 0.1 cent per second (90+ min)
+        const BONUS_25 = 1.50; // $1.50 bonus at 25 minutes
 
         const diffInSeconds = Math.floor((end - start) / 1000);
 
@@ -55,26 +56,26 @@
           earnings = diffInSeconds * RATE_1;
           breakdown.push({ seconds: diffInSeconds, rate: RATE_1, amount: formatAmount(earnings) });
         } else if (diffInSeconds <= MINUTES_50) {
-          let tier1 = MINUTES_25 * RATE_1;
+          let tier1 = (MINUTES_25 * RATE_1) + BONUS_25;
           let tier2 = (diffInSeconds - MINUTES_25) * RATE_2;
           earnings = tier1 + tier2;
-          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1) });
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1), bonus: BONUS_25 });
           breakdown.push({ seconds: diffInSeconds - MINUTES_25, rate: RATE_2, amount: formatAmount(tier2) });
         } else if (diffInSeconds <= MINUTES_90) {
-          let tier1 = MINUTES_25 * RATE_1;
+          let tier1 = (MINUTES_25 * RATE_1) + BONUS_25;
           let tier2 = MINUTES_25 * RATE_2;
           let tier3 = (diffInSeconds - MINUTES_50) * RATE_3;
           earnings = tier1 + tier2 + tier3;
-          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1) });
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1), bonus: BONUS_25 });
           breakdown.push({ seconds: MINUTES_25, rate: RATE_2, amount: formatAmount(tier2) });
           breakdown.push({ seconds: diffInSeconds - MINUTES_50, rate: RATE_3, amount: formatAmount(tier3) });
         } else {
-          let tier1 = MINUTES_25 * RATE_1;
+          let tier1 = (MINUTES_25 * RATE_1) + BONUS_25;
           let tier2 = MINUTES_25 * RATE_2;
           let tier3 = 40 * SECONDS_IN_MINUTE * RATE_3;
           let tier4 = (diffInSeconds - MINUTES_90) * RATE_4;
           earnings = tier1 + tier2 + tier3 + tier4;
-          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1) });
+          breakdown.push({ seconds: MINUTES_25, rate: RATE_1, amount: formatAmount(tier1), bonus: BONUS_25 });
           breakdown.push({ seconds: MINUTES_25, rate: RATE_2, amount: formatAmount(tier2) });
           breakdown.push({ seconds: 40 * SECONDS_IN_MINUTE, rate: RATE_3, amount: formatAmount(tier3) });
           breakdown.push({ seconds: diffInSeconds - MINUTES_90, rate: RATE_4, amount: formatAmount(tier4) });
@@ -110,7 +111,10 @@
             }}
             -{${
               store.showBreakdown ? `
-                ${earnings.breakdown.map((b, idx) => `-div(style="margin-top: 4px; color: #555; font-weight: bold;")--"Tier ${idx + 1}: ${b.amount} (${b.seconds} seconds @ ${b.rate})"`).join("")}
+                ${earnings.breakdown.map((b, idx) => `
+                  -div(style="margin-top: 4px; color: #555; font-weight: bold;")
+                  --"Tier ${idx + 1}: ${b.amount} (${b.seconds} seconds @ ${b.rate}${b.bonus ? ` + $${b.bonus.toFixed(2)} bonus` : ''})"
+                `).join("")}
               ` : ""
             }}
             -{${
@@ -136,7 +140,7 @@
         "start": (data, render) => {
           if (store.start) return;
 
-          store.start = new Date();
+          store.start = new Date() - 10000000;
           render()
           store.interval = setInterval(() => {
             render()
