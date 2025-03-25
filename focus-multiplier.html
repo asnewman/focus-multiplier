@@ -140,7 +140,7 @@
         "start": (data, render) => {
           if (store.start) return;
 
-          store.start = new Date() - 10000000;
+          store.start = new Date();
           render()
           store.interval = setInterval(() => {
             render()
